@@ -65,6 +65,7 @@ class HfArgumentParser(ArgumentParser):
                     "We will add compatibility when Python 3.9 is released."
                 )
             typestring = str(field.type)
+            origin_type = getattr(field.type, "__origin__", field.type)
             for prim_type in (int, float, str):
                 for collection in (List,):
                     if typestring == f"typing.Union[{collection[prim_type]}, NoneType]":
@@ -91,7 +92,15 @@ class HfArgumentParser(ArgumentParser):
                     x == kwargs["type"] for x in field.type.__args__
                 ), "{} cannot be a List of mixed types".format(field.name)
                 if field.default_factory is not dataclasses.MISSING:
+                    kwargs["default"] = field.default_factory       
+            # Python 3.10 fix        
+            elif isclass(origin_type) and issubclass(origin_type, list):
+                kwargs["type"] = field.type.__args__[0]
+                kwargs["nargs"] = "+"
+                if field.default_factory is not dataclasses.MISSING:
                     kwargs["default"] = field.default_factory()
+                elif field.default is dataclasses.MISSING:
+                    kwargs["required"] = True  
             else:
                 kwargs["type"] = field.type
                 if field.default is not dataclasses.MISSING:
